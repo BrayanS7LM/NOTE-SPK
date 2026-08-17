@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Note Speak</string>
+    <string name="logo_content_desc">Logotipo de Note Speak</string>
+    <string name="splash_announce">Note Speak iniciada</string>
+</resources>
