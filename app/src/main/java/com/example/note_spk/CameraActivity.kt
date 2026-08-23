@@ -14,12 +14,15 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import android.util.Log
 
 class CameraActivity : AppCompatActivity() {
 
     private lateinit var viewFinder: PreviewView
     private lateinit var btnTakePhoto: ImageButton
     private var imageCapture: ImageCapture? = null
+
+    private var camera: androidx.camera.core.Camera? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +47,7 @@ class CameraActivity : AppCompatActivity() {
     // Función para capturar foto (simulada)
     private fun takePhoto() {
         val imageCapture = imageCapture ?: return
+
 
         try {
             // Aquí normalmente guardarías la foto o la procesarías.
@@ -76,9 +80,19 @@ class CameraActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                camera = cameraProvider.bindToLifecycle(   // <-- agrega "camera = " aquí
                     this, cameraSelector, preview, imageCapture
                 )
+
+                // LOG TEMPORAL
+                Log.d("CameraDebug", "Lens facing: ${camera?.cameraInfo?.lensFacing}, hasFlash: ${camera?.cameraInfo?.hasFlashUnit()}")
+
+                if (camera?.cameraInfo?.hasFlashUnit() == true) {
+                    camera?.cameraControl?.enableTorch(true)
+                } else {
+                    Toast.makeText(this, "Este dispositivo no tiene flash", Toast.LENGTH_SHORT).show()
+                }
+
             } catch (exc: Exception) {
                 Toast.makeText(this, "Error al iniciar la cámara", Toast.LENGTH_SHORT).show()
             }
