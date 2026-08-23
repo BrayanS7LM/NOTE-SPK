@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1098557488839",
+    "project_id": "note-spk",
+    "storage_bucket": "note-spk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1098557488839:android:1b623fc0dfb2da35d608e2",
+        "android_client_info": {
+          "package_name": "com.example.note_spk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzHQqhZCGtj0-XY-b2bW5mcnAItNeGNRs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
