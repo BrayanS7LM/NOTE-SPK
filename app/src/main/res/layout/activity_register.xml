@@ -28,7 +28,7 @@
             android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Iniciar sesión"
+            android:text="Crear una cuenta"
             android:textStyle="bold"
             android:textColor="@android:color/white"
             android:textSize="18sp"
@@ -38,18 +38,34 @@
             android:id="@+id/tvInstruction"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Introduce tu correo electrónico y contraseña para entrar"
+            android:text="Introduce tus datos para registrarte en esta aplicación"
             android:textColor="@android:color/white"
             android:gravity="center"
             android:layout_marginTop="10dp"
             android:layout_marginBottom="20dp"
             android:textSize="14sp"/>
 
+        <!-- Nombre -->
+        <EditText
+            android:id="@+id/etName"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Nombre"
+            android:inputType="textPersonName|textCapWords"
+            android:background="@drawable/bg_edittext"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:textColor="#000000"
+            android:textColorHint="#808080"
+            android:importantForAccessibility="yes"
+            android:contentDescription="Campo para ingresar el nombre" />
+
         <!-- Correo -->
         <EditText
             android:id="@+id/etEmail"
             android:layout_width="match_parent"
             android:layout_height="48dp"
+            android:layout_marginTop="12dp"
             android:hint="email@domain.com"
             android:inputType="textEmailAddress"
             android:background="@drawable/bg_edittext"
@@ -78,7 +94,7 @@
 
         <!-- Botón principal: redondeado negro -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnContinue"
+            android:id="@+id/btnRegister"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="CONTINUAR"
@@ -126,12 +142,12 @@
             app:cornerRadius="8dp"/>
 
         <TextView
-            android:id="@+id/tvCreateAccount"
+            android:id="@+id/tvHaveAccount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:padding="8dp"
-            android:text="¿No tienes cuenta? Regístrate"
+            android:text="¿Ya tienes cuenta? Inicia sesión"
             android:textColor="#FFFFFF"
             android:textSize="14sp" />
 
