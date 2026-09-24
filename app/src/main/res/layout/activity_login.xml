@@ -82,6 +82,7 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="CONTINUAR"
+            android:contentDescription="Botón continuar. Iniciar sesión con correo y contraseña"
             android:layout_marginTop="20dp"
             android:paddingVertical="0dp"
             android:textColor="@android:color/white"
@@ -101,6 +102,7 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="CONTINUAR CON GOOGLE"
+            android:contentDescription="Botón continuar con Google"
             app:icon="@drawable/ic_google"
             app:iconGravity="textStart"
             app:iconPadding="12dp"
@@ -110,21 +112,6 @@
             android:textColor="#000000"
             app:cornerRadius="8dp"/>
 
-        <!-- Facebook button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFacebook"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="CONTINUAR CON FACEBOOK"
-            app:icon="@drawable/ic_facebook"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp"
-            app:iconTint="@null"
-            app:iconSize="24dp"
-            android:backgroundTint="#1877F2"
-            android:textColor="@android:color/white"
-            app:cornerRadius="8dp"/>
-
         <TextView
             android:id="@+id/tvCreateAccount"
             android:layout_width="wrap_content"
@@ -132,8 +119,9 @@
             android:layout_marginTop="16dp"
             android:padding="8dp"
             android:text="¿No tienes cuenta? Regístrate"
+            android:contentDescription="Crear una cuenta nueva"
             android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textSize="14sp"/>
 
         <TextView
             android:id="@+id/tvTerms"

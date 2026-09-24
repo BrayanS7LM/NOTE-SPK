@@ -5,32 +5,44 @@ import android.os.Bundle
 import android.util.Patterns
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import com.example.note_spk.databinding.ActivityLoginBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseUser
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
+    private lateinit var biometricPrompt: BiometricPrompt
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        auth = FirebaseAuth.getInstance()
-
-        // Si ya hay una sesión iniciada, saltar directo a Home
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-            goToHome(currentUser.displayName.orEmpty(), currentUser.email.orEmpty())
-            return
-        }
-
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Botón continuar
+        auth = FirebaseAuth.getInstance()
+        setupBiometricPrompt()
+        setupClickListeners()
+
+        // Si ya hay una sesión guardada, intentar entrar con huella
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            if (isBiometricAvailable()) {
+                showBiometricPrompt(currentUser)
+            } else {
+                // El celular no tiene huella configurada: continuar con la sesión guardada
+                goToHome(currentUser.displayName.orEmpty(), currentUser.email.orEmpty())
+            }
+        }
+    }
+
+    private fun setupClickListeners() {
+        // Botón continuar (correo y contraseña)
         binding.btnContinue.setOnClickListener {
             if (validateFields()) {
                 val email = binding.etEmail.text.toString().trim()
@@ -54,6 +66,63 @@ class LoginActivity : AppCompatActivity() {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
     }
+
+    // ---------- HUELLA ----------
+
+    private fun isBiometricAvailable(): Boolean {
+        val biometricManager = BiometricManager.from(this)
+        return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+                BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    private fun setupBiometricPrompt() {
+        val executor = ContextCompat.getMainExecutor(this)
+
+        biometricPrompt = BiometricPrompt(
+            this,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    val user = auth.currentUser
+                    goToHome(user?.displayName.orEmpty(), user?.email.orEmpty())
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    // El usuario canceló o eligió "Usar contraseña": se queda en el formulario visible
+                    if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                        errorCode != BiometricPrompt.ERROR_USER_CANCELED
+                    ) {
+                        Toast.makeText(this@LoginActivity, errString, Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "Huella no reconocida, intenta de nuevo",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        )
+    }
+
+    private fun showBiometricPrompt(user: FirebaseUser) {
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Iniciar sesión")
+            .setSubtitle("Usa tu huella para entrar como ${user.displayName ?: user.email}")
+            .setNegativeButtonText("Usar contraseña")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    // ---------- LOGIN CON CORREO Y CONTRASEÑA ----------
 
     private fun validateFields(): Boolean {
         val email = binding.etEmail.text.toString().trim()
