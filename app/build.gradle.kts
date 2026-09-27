@@ -9,6 +9,9 @@ android {
     namespace = "com.example.note_spk"
     compileSdk = 36
 
+    androidResources {
+        noCompress += "tflite"
+    }
 
     defaultConfig {
         applicationId = "com.example.note_spk"
@@ -57,19 +60,19 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.2.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("com.google.android.material:material:1.12.0")
     val camerax_version = "1.4.2"
     implementation ("androidx.camera:camera-core:$camerax_version")
     implementation ("androidx.camera:camera-camera2:$camerax_version")
     implementation ("androidx.camera:camera-lifecycle:$camerax_version")
-    implementation ("androidx.camera:camera-view:1.2.0-alpha02")
+    implementation("androidx.camera:camera-view:${camerax_version}")
     implementation ("androidx.camera:camera-extensions:$camerax_version")
-    implementation("com.google.android.material:material:1.9.0")
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.guava:guava:33.4.0-android")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
