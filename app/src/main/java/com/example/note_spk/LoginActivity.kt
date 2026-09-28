@@ -55,12 +55,6 @@ class LoginActivity : AppCompatActivity() {
         binding.btnGoogle.setOnClickListener {
             Toast.makeText(this, "Iniciar con Google (futuro desarrollo)", Toast.LENGTH_SHORT).show()
         }
-
-        // Botón Facebook
-        binding.btnFacebook.setOnClickListener {
-            Toast.makeText(this, "Iniciar con Facebook (futuro desarrollo)", Toast.LENGTH_SHORT).show()
-        }
-
         // Ir a la pantalla de registro
         binding.tvCreateAccount.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))

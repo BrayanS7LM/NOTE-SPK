@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import com.example.note_spk.databinding.ActivityScanResultBinding
-import kotlin.random.Random
 
 class ScanResultActivity : AppCompatActivity() {
 
@@ -12,31 +11,66 @@ class ScanResultActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityScanResultBinding.inflate(layoutInflater)
+
+        binding =
+            ActivityScanResultBinding.inflate(layoutInflater)
+
         setContentView(binding.root)
 
-        // Lista de valores simulados de billetes o monedas
-        val valoresPosibles = listOf(
-            "$1.000","2.000","5.000","10.000","20.000","50.000","100.000"
-        )
+        // =====================================================
+        // RECIBIR RESULTADO REAL DEL DETECTOR
+        // =====================================================
 
-        // Generar valor aleatorio
-        val valorAleatorio = valoresPosibles[Random.nextInt(valoresPosibles.size)]
+        val valorDetectado =
+            intent.getStringExtra("BILLETE_DETECTADO")
+                ?: "No identificado"
 
-        // Mostrar en pantalla
-        binding.tvResultado.text = "Tu billete es de:\n$valorAleatorio"
+        val confianza =
+            intent.getFloatExtra(
+                "CONFIANZA",
+                0f
+            )
 
-        // ✅ Botón "Sí": volver a la cámara (ScanActivity)
+        // =====================================================
+        // MOSTRAR RESULTADO
+        // =====================================================
+
+        binding.tvResultado.text =
+            "Tu billete es de:\n$valorDetectado"
+
+        // =====================================================
+        // BOTÓN SÍ
+        // Volver a escanear
+        // =====================================================
+
         binding.btnSi.setOnClickListener {
-            val intent = Intent(this, CameraActivity::class.java)
+
+            val intent =
+                Intent(
+                    this,
+                    CameraActivity::class.java
+                )
+
             startActivity(intent)
-            finish() // Cierra esta pantalla para evitar volver atrás
+
+            finish()
         }
 
-        // ✅ Botón "No": volver al HomeActivity
+        // =====================================================
+        // BOTÓN NO
+        // Volver al Home
+        // =====================================================
+
         binding.btnNo.setOnClickListener {
-            val intent = Intent(this, HomeActivity::class.java)
+
+            val intent =
+                Intent(
+                    this,
+                    HomeActivity::class.java
+                )
+
             startActivity(intent)
+
             finish()
         }
     }

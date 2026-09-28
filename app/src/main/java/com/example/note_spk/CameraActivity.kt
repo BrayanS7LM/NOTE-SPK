@@ -4,115 +4,298 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.ImageButton
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-import android.util.Log
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class CameraActivity : AppCompatActivity() {
 
     private lateinit var viewFinder: PreviewView
     private lateinit var btnTakePhoto: ImageButton
+
     private var imageCapture: ImageCapture? = null
 
     private var camera: androidx.camera.core.Camera? = null
 
+    // Analizador de imágenes
+    private var imageAnalysis: ImageAnalysis? = null
+
+    // Detector de billetes
+    private lateinit var billeteDetector: BilleteDetector
+
+    // Hilo para procesar las imágenes de CameraX
+    private lateinit var cameraExecutor: ExecutorService
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContentView(R.layout.activity_camera)
 
         viewFinder = findViewById(R.id.viewFinder)
         btnTakePhoto = findViewById(R.id.btnTakePhoto)
 
-        // Verificar permisos de cámara antes de iniciar
+        // =========================================================
+        // INICIALIZAR DETECTOR
+        // =========================================================
+
+        billeteDetector = BilleteDetector(this)
+
+        // =========================================================
+        // EXECUTOR PARA CAMERA X
+        // =========================================================
+
+        cameraExecutor = Executors.newSingleThreadExecutor()
+
+        // =========================================================
+        // PERMISO DE CÁMARA
+        // =========================================================
+
         if (allPermissionsGranted()) {
             startCamera()
         } else {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            requestPermissionLauncher.launch(
+                Manifest.permission.CAMERA
+            )
         }
 
-        // Acción del botón para tomar la foto
+        // =========================================================
+        // BOTÓN DE FOTO
+        // =========================================================
+
         btnTakePhoto.setOnClickListener {
             takePhoto()
         }
     }
 
-    // Función para capturar foto (simulada)
-    private fun takePhoto() {
-        val imageCapture = imageCapture ?: return
+    // =============================================================
+    // INICIAR CÁMARA
+    // =============================================================
 
-
-        try {
-            // Aquí normalmente guardarías la foto o la procesarías.
-            // Por ahora, simulamos que se tomó correctamente.
-            Toast.makeText(this, "Foto capturada correctamente", Toast.LENGTH_SHORT).show()
-
-            // Ir a la pantalla de procesamiento
-            val intent = Intent(this, ProcessingActivity::class.java)
-            startActivity(intent)
-            finish()
-
-        } catch (exc: Exception) {
-            Toast.makeText(this, "Error al tomar foto: ${exc.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // Configurar la cámara
     private fun startCamera() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        val cameraProviderFuture =
+            ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(viewFinder.surfaceProvider)
+
+            val cameraProvider =
+                cameraProviderFuture.get()
+
+            // =====================================================
+            // PREVIEW
+            // =====================================================
+
+            val preview =
+                Preview.Builder()
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(
+                            viewFinder.surfaceProvider
+                        )
+                    }
+
+            // =====================================================
+            // CAPTURA DE FOTO
+            // =====================================================
+
+            imageCapture =
+                ImageCapture.Builder()
+                    .build()
+
+            // =====================================================
+            // ANÁLISIS DE IMAGEN
+            // =====================================================
+
+            imageAnalysis =
+                ImageAnalysis.Builder()
+                    .setBackpressureStrategy(
+                        ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                    )
+                    .build()
+
+            imageAnalysis?.setAnalyzer(
+                cameraExecutor
+            ) { imageProxy ->
+
+                // Enviar cada frame al detector
+                billeteDetector.processImage(
+                    imageProxy
+                )
             }
 
-            imageCapture = ImageCapture.Builder().build()
+            // =====================================================
+            // CÁMARA TRASERA
+            // =====================================================
 
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            val cameraSelector =
+                CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
+
+                // Eliminar configuraciones anteriores
                 cameraProvider.unbindAll()
-                camera = cameraProvider.bindToLifecycle(   // <-- agrega "camera = " aquí
-                    this, cameraSelector, preview, imageCapture
+
+                // =================================================
+                // CONECTAR TODO
+                // =================================================
+
+                camera =
+                    cameraProvider.bindToLifecycle(
+                        this,
+                        cameraSelector,
+                        preview,
+                        imageCapture,
+                        imageAnalysis
+                    )
+
+                Log.d(
+                    "CameraDebug",
+                    "Cámara iniciada correctamente"
                 )
 
-                // LOG TEMPORAL
-                Log.d("CameraDebug", "Lens facing: ${camera?.cameraInfo?.lensFacing}, hasFlash: ${camera?.cameraInfo?.hasFlashUnit()}")
+                Log.d(
+                    "CameraDebug",
+                    "Lens facing: ${camera?.cameraInfo?.lensFacing}"
+                )
 
-                if (camera?.cameraInfo?.hasFlashUnit() == true) {
-                    camera?.cameraControl?.enableTorch(true)
+                Log.d(
+                    "CameraDebug",
+                    "Tiene flash: ${camera?.cameraInfo?.hasFlashUnit()}"
+                )
+
+                // =================================================
+                // FLASH
+                // =================================================
+
+                if (
+                    camera?.cameraInfo?.hasFlashUnit() == true
+                ) {
+
+                    camera?.cameraControl
+                        ?.enableTorch(true)
+
                 } else {
-                    Toast.makeText(this, "Este dispositivo no tiene flash", Toast.LENGTH_SHORT).show()
+
+                    Toast.makeText(
+                        this,
+                        "Este dispositivo no tiene flash",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
 
             } catch (exc: Exception) {
-                Toast.makeText(this, "Error al iniciar la cámara", Toast.LENGTH_SHORT).show()
+
+                Log.e(
+                    "CameraDebug",
+                    "Error al iniciar cámara",
+                    exc
+                )
+
+                Toast.makeText(
+                    this,
+                    "Error al iniciar la cámara: ${exc.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // Verificar permiso de cámara
-    private fun allPermissionsGranted() = ContextCompat.checkSelfPermission(
-        baseContext, Manifest.permission.CAMERA
-    ) == PackageManager.PERMISSION_GRANTED
+    // =============================================================
+    // TOMAR FOTO
+    // =============================================================
 
-    // Solicitar permisos con launcher
+    private fun takePhoto() {
+
+        val imageCapture =
+            imageCapture ?: return
+
+        try {
+
+            Toast.makeText(
+                this,
+                "Foto capturada correctamente",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            val intent =
+                Intent(
+                    this,
+                    ProcessingActivity::class.java
+                )
+
+            startActivity(intent)
+
+            finish()
+
+        } catch (exc: Exception) {
+
+            Toast.makeText(
+                this,
+                "Error al tomar foto: ${exc.message}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // =============================================================
+    // VERIFICAR PERMISO
+    // =============================================================
+
+    private fun allPermissionsGranted(): Boolean {
+
+        return ContextCompat.checkSelfPermission(
+            baseContext,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    // =============================================================
+    // SOLICITAR PERMISO
+    // =============================================================
+
     private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+
             if (isGranted) {
+
                 startCamera()
+
             } else {
-                Toast.makeText(this, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+
+                Toast.makeText(
+                    this,
+                    "Permiso de cámara denegado",
+                    Toast.LENGTH_SHORT
+                ).show()
+
                 finish()
             }
         }
+
+    // =============================================================
+    // LIBERAR RECURSOS
+    // =============================================================
+
+    override fun onDestroy() {
+
+        super.onDestroy()
+
+        if (::cameraExecutor.isInitialized) {
+            cameraExecutor.shutdown()
+        }
+    }
 }
