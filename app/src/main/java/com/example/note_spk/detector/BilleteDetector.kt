@@ -1,180 +1,343 @@
-package com.example.note_spk.detector
-
+package com.example.note_spk
+import android.util.Log
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.SystemClock
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.speech.tts.TextToSpeech
-import android.util.Log
-import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import org.tensorflow.lite.Interpreter
+import java.io.ByteArrayOutputStream
+import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.util.Locale
-import kotlin.math.max
-import kotlin.math.min
 
 class BilleteDetector(
-    private val context: Context,
-    private val onGuidance: (String) -> Unit,
-    private val onConfirmed: (classId: Int, confidence: Float) -> Unit
-) : ImageAnalysis.Analyzer {
+    private val context: Context
+) : TextToSpeech.OnInitListener {
 
     companion object {
 
-        private const val TAG = "BilleteDetector"
+        // =========================================================
+        // CONFIGURACIÓN DEL MODELO
+        // =========================================================
+
+        private const val MODEL_NAME = "best.tflite"
 
         private const val INPUT_SIZE = 640
 
-        /*
-  * Detección inicial.
-  */
-        private const val POSSIBLE_CONFIDENCE = 0.40f
-        private const val CONFIRMED_CONFIDENCE = 0.70f
+        private const val NUM_CLASSES = 6
 
-        /*
-         * Cantidad de fotogramas consecutivos necesarios
-         * para considerar estable una detección.
-         */
-        private const val REQUIRED_STABLE_FRAMES = 5
+        private const val NUM_DETECTIONS = 8400
 
-        /*
-         * Área aproximada del billete dentro de la imagen.
-         */
-        private const val TOO_FAR_AREA = 0.12f
-        private const val TOO_CLOSE_AREA = 0.75f
+        // =========================================================
+        // UMBRALES
+        // =========================================================
 
-        /*
-         * Tiempo mínimo entre mensajes de voz.
-         */
-        private const val GUIDANCE_INTERVAL_MS = 1800L
+        private const val CONFIRM_THRESHOLD = 0.80f
 
-        /*
-         * Tiempo mínimo antes de permitir una nueva confirmación.
-         */
-        private const val CONFIRMATION_COOLDOWN_MS = 3000L
+        private const val POSSIBLE_THRESHOLD = 0.40f
+
+        // Tiempo para evitar repetir el mismo billete
+        private const val ANNOUNCE_COOLDOWN_MS = 2500L
+        // =========================================================
+// ESTABILIZACIÓN DE DETECCIONES
+// =========================================================
+
+        // Cantidad de detecciones consecutivas necesarias
+        private const val REQUIRED_STABLE_DETECTIONS = 3
+
+        // Confianza mínima para participar en la confirmación
+        private const val STABILITY_MIN_CONFIDENCE = 0.80f
+
+        // Tiempo máximo permitido entre detecciones consecutivas
+        private const val STABILITY_TIMEOUT_MS = 1500L
+
+        // =========================================================
+        // CLASES DEL MODELO
+        // =========================================================
+
+        private val CLASS_NAMES = arrayOf(
+            "Cien_Mil",
+            "Diez_Mil",
+            "Veinte_Mil",
+            "Dos_Mil",
+            "Cincuenta_Mil",
+            "Cinco_Mil"
+        )
+
+        // =========================================================
+        // NOMBRES PARA TEXT TO SPEECH
+        // =========================================================
+
+        private val SPEECH_NAMES = arrayOf(
+            "cien mil pesos",
+            "diez mil pesos",
+            "veinte mil pesos",
+            "dos mil pesos",
+            "cincuenta mil pesos",
+            "cinco mil pesos"
+        )
     }
 
-    private val interpreter: Interpreter
+    // =============================================================
+    // VARIABLES
+    // =============================================================
 
-    private val tts: TextToSpeech
+    private var interpreter: Interpreter? = null
 
-    private var lastGuidanceTime = 0L
-    private var lastConfirmationTime = 0L
+    private lateinit var textToSpeech: TextToSpeech
 
-    private var lastClassId = -1
-    private var stableFrames = 0
+    private val firestore =
+        FirebaseFirestore.getInstance()
 
-    private var alreadyConfirmed = false
+    private val auth =
+        FirebaseAuth.getInstance()
+
+    private var lastAnnouncedClass = -1
+
+    private var lastAnnouncedTime = 0L
+
+    @Volatile
+    private var isProcessing = false
+
+// =========================================================
+// ESTABILIZACIÓN
+// =========================================================
+
+    // Clase que estamos acumulando
+    private var stableClassId = -1
+
+    // Cantidad de frames consecutivos con la misma clase
+    private var stableDetectionCount = 0
+
+    // Suma de confianzas para calcular el promedio
+    private var stableConfidenceSum = 0f
+
+    // Momento de la última detección válida
+    private var lastStableDetectionTime = 0L
 
     init {
 
-        /*
-         * Cargar el modelo desde assets.
-         *
-         * Debe existir:
-         *
-         * app/src/main/assets/best.tflite
-         */
-        val model = context.assets.open("best.tflite").use {
-            it.readBytes()
-        }
-
-        val buffer = ByteBuffer.allocateDirect(model.size)
-        buffer.order(ByteOrder.nativeOrder())
-        buffer.put(model)
-        buffer.rewind()
-
-        interpreter = Interpreter(buffer)
-
-        /*
-         * TextToSpeech
-         */
-        tts = TextToSpeech(context) { status ->
-
-            if (status == TextToSpeech.SUCCESS) {
-
-                tts.language = Locale("es", "ES")
-
-                tts.setSpeechRate(0.95f)
-
-                Log.d(TAG, "TextToSpeech inicializado")
-
-            } else {
-
-                Log.e(TAG, "No se pudo inicializar TextToSpeech")
-            }
-        }
-    }
-
-    @OptIn(ExperimentalGetImage::class)
-    override fun analyze(imageProxy: ImageProxy) {
+        Log.d(
+            "BilleteDetector",
+            "INICIANDO DETECTOR"
+        )
 
         try {
 
-            if (alreadyConfirmed) {
-                imageProxy.close()
-                return
-            }
-
-            val image = imageProxy.image
-
-            if (image == null) {
-                imageProxy.close()
-                return
-            }
-
-            /*
-             * IMPORTANTE:
-             *
-             * Utilizamos la función existente del proyecto
-             * para convertir ImageProxy -> Bitmap.
-             */
-            val bitmap = imageProxy.toBitmap()
-
-            val resizedBitmap = Bitmap.createScaledBitmap(
-                bitmap,
-                INPUT_SIZE,
-                INPUT_SIZE,
-                true
+            // Cargar modelo
+            interpreter = Interpreter(
+                loadModelFile(
+                    context,
+                    MODEL_NAME
+                )
             )
 
-            val input = bitmapToByteBuffer(resizedBitmap)
+            Log.d(
+                "BilleteDetector",
+                "MODELO best.tflite CARGADO CORRECTAMENTE"
+            )
 
-            /*
-             * YOLOv8:
-             *
-             * [1, 10, 8400]
-             *
-             * 4 valores de bounding box
-             * + 6 clases
-             */
-            val output = Array(
-                1
-            ) {
-                Array(
-                    10
-                ) {
-                    FloatArray(8400)
-                }
-            }
+            // Inicializar TextToSpeech
+            textToSpeech = TextToSpeech(
+                context,
+                this
+            )
 
-            interpreter.run(input, output)
+            Log.d(
+                "BilleteDetector",
+                "TEXT TO SPEECH INICIADO"
+            )
 
-            val detection = processOutput(output)
+        } catch (e: Exception) {
 
-            if (detection == null) {
+            Log.e(
+                "BilleteDetector",
+                "ERROR AL INICIALIZAR DETECTOR",
+                e
+            )
+        }
+    }
 
-                stableFrames = 0
-                lastClassId = -1
+    // =============================================================
+    // TEXT TO SPEECH
+    // =============================================================
 
-                speakGuidance(
-                    "Buscando el billete"
+    override fun onInit(status: Int) {
+
+        if (status == TextToSpeech.SUCCESS) {
+
+            val result =
+                textToSpeech.setLanguage(
+                    Locale("es", "CO")
                 )
 
-            } else {
+            if (
+                result == TextToSpeech.LANG_MISSING_DATA ||
+                result == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+
+                textToSpeech.language =
+                    Locale("es")
+            }
+
+            textToSpeech.setSpeechRate(0.95f)
+        }
+    }
+
+    // =============================================================
+    // PROCESAR IMAGEN DE CAMERAX
+    // =============================================================
+
+    fun processImage(
+        imageProxy: ImageProxy
+    ) {
+
+        Log.d(
+            "BilleteDetector",
+            "FRAME RECIBIDO: ${imageProxy.width}x${imageProxy.height}"
+        )
+
+        // ---------------------------------------------------------
+        // Evitar procesar varias imágenes simultáneamente
+        // ---------------------------------------------------------
+        // ---------------------------------------------------------
+
+        if (isProcessing) {
+
+            imageProxy.close()
+
+            return
+        }
+
+        isProcessing = true
+
+        try {
+
+            // -----------------------------------------------------
+            // IMAGEPROXY → BITMAP
+            // -----------------------------------------------------
+
+            Log.d(
+                "BilleteDetector",
+                "INICIANDO CONVERSION A BITMAP"
+            )
+
+            val bitmap =
+                imageProxyToBitmap(
+                    imageProxy
+                )
+
+            Log.d(
+                "BilleteDetector",
+                "CONVERSION A BITMAP TERMINADA"
+            )
+
+            if (bitmap == null) {
+
+                return
+            }
+
+            // -----------------------------------------------------
+            // ROTAR IMAGEN
+            // -----------------------------------------------------
+
+            val rotatedBitmap =
+                rotateBitmap(
+                    bitmap,
+                    imageProxy
+                        .imageInfo
+                        .rotationDegrees
+                )
+
+            // -----------------------------------------------------
+            // REDIMENSIONAR A 640 x 640
+            // -----------------------------------------------------
+
+            val inputBitmap =
+                Bitmap.createScaledBitmap(
+                    rotatedBitmap,
+                    INPUT_SIZE,
+                    INPUT_SIZE,
+                    true
+                )
+            Log.d(
+                "BilleteDetector",
+                "BITMAP ESCALADO A 640x640"
+            )
+            // -----------------------------------------------------
+            // BITMAP → BUFFER
+            // -----------------------------------------------------
+
+            val input =
+                bitmapToInputBuffer(
+                    inputBitmap
+                )
+            Log.d(
+                "BilleteDetector",
+                "BUFFER DE ENTRADA CREADO"
+            )
+
+            // -----------------------------------------------------
+            // SALIDA DEL MODELO
+            //
+            // best.tflite:
+            //
+            // (1, 10, 8400)
+            //
+            // 0 = centerX
+            // 1 = centerY
+            // 2 = width
+            // 3 = height
+            //
+            // 4 = clase 0
+            // 5 = clase 1
+            // 6 = clase 2
+            // 7 = clase 3
+            // 8 = clase 4
+            // 9 = clase 5
+            // -----------------------------------------------------
+
+            val output =
+                Array(1) {
+                    Array(10) {
+                        FloatArray(
+                            NUM_DETECTIONS
+                        )
+                    }
+                }
+
+            // -----------------------------------------------------
+            // EJECUTAR TFLITE
+            // -----------------------------------------------------
+
+            interpreter?.run(
+                input,
+                output
+            )
+
+            Log.d(
+                "BilleteDetector",
+                "MODELO EJECUTADO CORRECTAMENTE"
+            )
+
+            // -----------------------------------------------------
+            // INTERPRETAR RESULTADO
+            // -----------------------------------------------------
+
+            val detection =
+                parseOutput(output)
+
+            if (detection != null) {
 
                 handleDetection(
                     detection
@@ -183,35 +346,557 @@ class BilleteDetector(
 
         } catch (e: Exception) {
 
-            Log.e(
-                TAG,
-                "Error analizando imagen",
-                e
-            )
+            e.printStackTrace()
 
         } finally {
 
+            // -----------------------------------------------------
+            // IMPORTANTE:
+            // cerrar ImageProxy siempre
+            // -----------------------------------------------------
+
             imageProxy.close()
+
+            isProcessing = false
         }
     }
 
-    private fun bitmapToByteBuffer(
+    // =============================================================
+    // ESTRUCTURA DE DETECCIÓN
+    // =============================================================
+
+    private data class Detection(
+
+        val classId: Int,
+
+        val confidence: Float,
+
+        val box: RectF
+    )
+
+    // =============================================================
+    // INTERPRETAR SALIDA DEL MODELO
+    // =============================================================
+
+    private fun parseOutput(
+        output: Array<Array<FloatArray>>
+    ): Detection? {
+
+        var bestDetection: Detection? =
+            null
+
+        var bestConfidence = 0f
+
+        // ---------------------------------------------------------
+        // Recorrer las 8400 detecciones
+        // ---------------------------------------------------------
+
+        for (
+        i in 0 until NUM_DETECTIONS
+        ) {
+
+            // -----------------------------------------------------
+            // COORDENADAS
+            // -----------------------------------------------------
+
+            val centerX =
+                output[0][0][i]
+
+            val centerY =
+                output[0][1][i]
+
+            val width =
+                output[0][2][i]
+
+            val height =
+                output[0][3][i]
+
+            // -----------------------------------------------------
+            // BUSCAR CLASE CON MAYOR CONFIANZA
+            // -----------------------------------------------------
+
+            var bestClass = -1
+
+            var classConfidence = 0f
+
+            for (
+            classId in 0 until NUM_CLASSES
+            ) {
+
+                val confidence =
+                    output[0][4 + classId][i]
+
+                if (
+                    confidence >
+                    classConfidence
+                ) {
+
+                    classConfidence =
+                        confidence
+
+                    bestClass =
+                        classId
+                }
+            }
+
+            // -----------------------------------------------------
+            // DESCARTAR BAJA CONFIANZA
+            // -----------------------------------------------------
+
+            if (
+                bestClass < 0 ||
+                classConfidence <
+                POSSIBLE_THRESHOLD
+            ) {
+
+                continue
+            }
+
+            // -----------------------------------------------------
+            // CALCULAR CAJA
+            // -----------------------------------------------------
+
+            val left =
+                centerX -
+                        width / 2f
+
+            val top =
+                centerY -
+                        height / 2f
+
+            val right =
+                centerX +
+                        width / 2f
+
+            val bottom =
+                centerY +
+                        height / 2f
+
+            val box =
+                RectF(
+                    left,
+                    top,
+                    right,
+                    bottom
+                )
+
+            // -----------------------------------------------------
+            // CONSERVAR LA DETECCIÓN MÁS CONFIABLE
+            // -----------------------------------------------------
+
+            if (
+                classConfidence >
+                bestConfidence
+            ) {
+
+                bestConfidence =
+                    classConfidence
+
+                bestDetection =
+                    Detection(
+                        classId =
+                            bestClass,
+
+                        confidence =
+                            classConfidence,
+
+                        box =
+                            box
+                    )
+            }
+        }
+
+        return bestDetection
+    }
+
+    // =============================================================
+    // MANEJAR DETECCIÓN
+    // =============================================================
+
+    // =============================================================
+// MANEJAR DETECCIÓN
+// =============================================================
+
+    private fun handleDetection(
+        detection: Detection
+    ) {
+
+        val classId =
+            detection.classId
+
+        val confidence =
+            detection.confidence
+
+        Log.d(
+            "BilleteDetector",
+            "DETECCIÓN: clase=$classId confianza=${confidence * 100}%"
+        )
+
+        // ---------------------------------------------------------
+        // Verificar clase
+        // ---------------------------------------------------------
+
+        if (
+            classId !in
+            CLASS_NAMES.indices
+        ) {
+
+            resetStability()
+
+            return
+        }
+
+        // ---------------------------------------------------------
+        // Confianza demasiado baja
+        // ---------------------------------------------------------
+
+        if (
+            confidence <
+            STABILITY_MIN_CONFIDENCE
+        ) {
+
+            Log.d(
+                "BilleteDetector",
+                "DESCARTADA: confianza insuficiente"
+            )
+
+            resetStability()
+
+            return
+        }
+
+        val currentTime =
+            System.currentTimeMillis()
+
+        // ---------------------------------------------------------
+        // Verificar si pasó demasiado tiempo
+        // desde la última detección
+        // ---------------------------------------------------------
+
+        if (
+            lastStableDetectionTime > 0L &&
+            currentTime -
+            lastStableDetectionTime >
+            STABILITY_TIMEOUT_MS
+        ) {
+
+            Log.d(
+                "BilleteDetector",
+                "REINICIANDO ESTABILIDAD POR TIEMPO"
+            )
+
+            resetStability()
+        }
+
+        lastStableDetectionTime =
+            currentTime
+
+        // ---------------------------------------------------------
+        // Si es una clase diferente,
+        // empezar nuevamente
+        // ---------------------------------------------------------
+
+        if (
+            classId !=
+            stableClassId
+        ) {
+
+            stableClassId =
+                classId
+
+            stableDetectionCount =
+                1
+
+            stableConfidenceSum =
+                confidence
+
+            Log.d(
+                "BilleteDetector",
+                "NUEVA CLASE: $classId | " +
+                        "contador=1/$REQUIRED_STABLE_DETECTIONS"
+            )
+
+            return
+        }
+
+        // ---------------------------------------------------------
+        // Misma clase → aumentar estabilidad
+        // ---------------------------------------------------------
+
+        stableDetectionCount++
+
+        stableConfidenceSum +=
+            confidence
+
+        Log.d(
+            "BilleteDetector",
+            "CLASE ESTABLE: $classId | " +
+                    "contador=$stableDetectionCount/" +
+                    "$REQUIRED_STABLE_DETECTIONS"
+        )
+
+        // ---------------------------------------------------------
+        // ¿Ya tenemos suficientes detecciones?
+        // ---------------------------------------------------------
+
+        if (
+            stableDetectionCount >=
+            REQUIRED_STABLE_DETECTIONS
+        ) {
+
+            val averageConfidence =
+                stableConfidenceSum /
+                        stableDetectionCount
+
+            Log.d(
+                "BilleteDetector",
+                "BILLETE CONFIRMADO: " +
+                        "clase=$stableClassId " +
+                        "confianzaPromedio=" +
+                        "${averageConfidence * 100}%"
+            )
+
+            val message =
+                "Billete de " +
+                        SPEECH_NAMES[stableClassId]
+
+            announceIfNeeded(
+                classId =
+                    stableClassId,
+
+                confidence =
+                    averageConfidence,
+
+                message =
+                    message,
+
+                confirmed =
+                    true
+            )
+
+            // -----------------------------------------------------
+            // IMPORTANTE:
+            // reiniciar para no confirmar el mismo billete
+            // inmediatamente otra vez
+            // -----------------------------------------------------
+
+            resetStability()
+        }
+    }
+// =============================================================
+// REINICIAR ESTABILIZACIÓN
+// =============================================================
+
+    private fun resetStability() {
+
+        stableClassId =
+            -1
+
+        stableDetectionCount =
+            0
+
+        stableConfidenceSum =
+            0f
+
+        lastStableDetectionTime =
+            0L
+    }
+    // =============================================================
+    // ANUNCIAR RESULTADO
+    // =============================================================
+
+    private fun announceIfNeeded(
+        classId: Int,
+        confidence: Float,
+        message: String,
+        confirmed: Boolean
+    ) {
+
+        val currentTime =
+            System.currentTimeMillis()
+
+        // ---------------------------------------------------------
+        // EVITAR REPETICIONES
+        // ---------------------------------------------------------
+
+        if (
+            classId ==
+            lastAnnouncedClass &&
+            currentTime -
+            lastAnnouncedTime <
+            ANNOUNCE_COOLDOWN_MS
+        ) {
+
+            return
+        }
+
+        lastAnnouncedClass =
+            classId
+
+        lastAnnouncedTime =
+            currentTime
+
+        // ---------------------------------------------------------
+        // HABLAR
+        // ---------------------------------------------------------
+
+        if (
+            ::textToSpeech
+                .isInitialized
+        ) {
+
+            textToSpeech.speak(
+                message,
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "billete_$classId"
+            )
+        }
+
+        // ---------------------------------------------------------
+        // GUARDAR EN FIRESTORE
+        // ---------------------------------------------------------
+
+        saveRecognition(
+            classId =
+                classId,
+
+            confidence =
+                confidence,
+
+            confirmed =
+                confirmed
+        )
+    }
+
+    // =============================================================
+    // FIRESTORE
+    // =============================================================
+
+    private fun saveRecognition(
+        classId: Int,
+        confidence: Float,
+        confirmed: Boolean
+    ) {
+
+        // ---------------------------------------------------------
+        // USUARIO ACTUAL
+        // ---------------------------------------------------------
+
+        val user =
+            auth.currentUser
+                ?: return
+
+        val uid =
+            user.uid
+
+        // ---------------------------------------------------------
+        // DATOS
+        // ---------------------------------------------------------
+
+        val data =
+            hashMapOf(
+
+                "billete" to
+                        CLASS_NAMES[classId],
+
+                "valor" to
+                        SPEECH_NAMES[classId],
+
+                "confianza" to
+                        confidence,
+
+                "confianzaPorcentaje" to
+                        confidence * 100f,
+
+                "confirmado" to
+                        confirmed,
+
+                "timestamp" to
+                        FieldValue.serverTimestamp()
+            )
+
+        // ---------------------------------------------------------
+        // GUARDAR
+        //
+        // Usuarios/{UID}/Reconocimientos
+        // ---------------------------------------------------------
+
+        firestore
+            .collection("Usuarios")
+            .document(uid)
+            .collection("Reconocimientos")
+            .add(data)
+            .addOnSuccessListener {
+
+                // Guardado correctamente
+
+            }
+            .addOnFailureListener { exception ->
+
+                exception.printStackTrace()
+            }
+    }
+
+    // =============================================================
+    // CARGAR MODELO TFLITE
+    // =============================================================
+
+    private fun loadModelFile(
+        context: Context,
+        modelName: String
+    ): MappedByteBuffer {
+
+        val fileDescriptor =
+            context.assets.openFd(
+                modelName
+            )
+
+        val inputStream =
+            FileInputStream(
+                fileDescriptor.fileDescriptor
+            )
+
+        val fileChannel =
+            inputStream.channel
+
+        val startOffset =
+            fileDescriptor.startOffset
+
+        val declaredLength =
+            fileDescriptor.declaredLength
+
+        return fileChannel.map(
+            FileChannel.MapMode.READ_ONLY,
+            startOffset,
+            declaredLength
+        )
+    }
+
+    // =============================================================
+    // BITMAP → BUFFER TFLITE
+    // =============================================================
+
+    private fun bitmapToInputBuffer(
         bitmap: Bitmap
     ): ByteBuffer {
 
-        val imageSize =
-            INPUT_SIZE * INPUT_SIZE * 3 * 4
+        val inputBuffer =
+            ByteBuffer.allocateDirect(
+                4 *
+                        INPUT_SIZE *
+                        INPUT_SIZE *
+                        3
+            )
 
-        val buffer =
-            ByteBuffer.allocateDirect(imageSize)
-
-        buffer.order(
+        inputBuffer.order(
             ByteOrder.nativeOrder()
         )
 
         val pixels =
             IntArray(
-                INPUT_SIZE * INPUT_SIZE
+                INPUT_SIZE *
+                        INPUT_SIZE
             )
 
         bitmap.getPixels(
@@ -224,307 +909,258 @@ class BilleteDetector(
             INPUT_SIZE
         )
 
+        // =========================================================
+        // MODELO YOLO: [1, 3, 640, 640]
+        //
+        // Primero todos los R
+        // Después todos los G
+        // Después todos los B
+        // =========================================================
+
+        // CANAL ROJO
         for (pixel in pixels) {
 
             val r =
-                ((pixel shr 16) and 0xFF) / 255.0f
+                (pixel shr 16) and 0xFF
+
+            inputBuffer.putFloat(
+                r / 255.0f
+            )
+        }
+
+        // CANAL VERDE
+        for (pixel in pixels) {
 
             val g =
-                ((pixel shr 8) and 0xFF) / 255.0f
+                (pixel shr 8) and 0xFF
+
+            inputBuffer.putFloat(
+                g / 255.0f
+            )
+        }
+
+        // CANAL AZUL
+        for (pixel in pixels) {
 
             val b =
-                (pixel and 0xFF) / 255.0f
+                pixel and 0xFF
 
-            buffer.putFloat(r)
-            buffer.putFloat(g)
-            buffer.putFloat(b)
+            inputBuffer.putFloat(
+                b / 255.0f
+            )
         }
 
-        buffer.rewind()
+        inputBuffer.rewind()
 
-        return buffer
+        return inputBuffer
     }
 
-    private data class Detection(
-        val classId: Int,
-        val confidence: Float,
-        val width: Float,
-        val height: Float
-    )
+    // =============================================================
+    // IMAGEPROXY → BITMAP
+    // =============================================================
 
-    private fun processOutput(
-        output: Array<Array<FloatArray>>
-    ): Detection? {
+    /*
+     * ESTA FUNCIÓN ES LA QUE USA imageProxy.image.
+     *
+     * Por eso la anotamos directamente con:
+     *
+     * @OptIn(ExperimentalGetImage::class)
+     *
+     * No usamos @file:OptIn.
+     */
 
-        var bestClass = -1
-        var bestConfidence = 0f
+    @androidx.annotation.OptIn(ExperimentalGetImage::class)
+    private fun imageProxyToBitmap(
+        imageProxy: ImageProxy
+    ): Bitmap? {
 
-        var bestWidth = 0f
-        var bestHeight = 0f
+        // ---------------------------------------------------------
+        // OBTENER IMAGEN
+        // ---------------------------------------------------------
 
-        /*
-         * El modelo tiene 8400 candidatos.
-         */
-        for (i in 0 until 8400) {
+        val image =
+            imageProxy.image
+                ?: return null
 
-            val x =
-                output[0][0][i]
+        // ---------------------------------------------------------
+        // PLANOS YUV
+        // ---------------------------------------------------------
 
-            val y =
-                output[0][1][i]
+        val yBuffer =
+            image.planes[0].buffer
 
-            val width =
-                output[0][2][i]
+        val uBuffer =
+            image.planes[1].buffer
 
-            val height =
-                output[0][3][i]
+        val vBuffer =
+            image.planes[2].buffer
 
-            /*
-             * Las 6 clases comienzan en el índice 4.
-             */
-            var localClass = -1
-            var localConfidence = 0f
+        val ySize =
+            yBuffer.remaining()
 
-            for (classIndex in 0 until 6) {
+        val uSize =
+            uBuffer.remaining()
 
-                val confidence =
-                    output[0][4 + classIndex][i]
+        val vSize =
+            vBuffer.remaining()
 
-                if (confidence > localConfidence) {
+        // ---------------------------------------------------------
+        // CREAR BUFFER NV21
+        // ---------------------------------------------------------
 
-                    localConfidence =
-                        confidence
+        val nv21 =
+            ByteArray(
+                ySize +
+                        uSize +
+                        vSize
+            )
 
-                    localClass =
-                        classIndex
-                }
-            }
+        yBuffer.get(
+            nv21,
+            0,
+            ySize
+        )
 
-            if (
-                localClass >= 0 &&
-                localConfidence > bestConfidence
-            ) {
+        vBuffer.get(
+            nv21,
+            ySize,
+            vSize
+        )
 
-                bestConfidence =
-                    localConfidence
+        uBuffer.get(
+            nv21,
+            ySize + vSize,
+            uSize
+        )
 
-                bestClass =
-                    localClass
+        // ---------------------------------------------------------
+        // YUV → JPEG
+        // ---------------------------------------------------------
 
-                bestWidth =
-                    width
+        val yuvImage =
+            android.graphics.YuvImage(
+                nv21,
+                android.graphics.ImageFormat.NV21,
+                image.width,
+                image.height,
+                null
+            )
 
-                bestHeight =
-                    height
-            }
-        }
+        val outputStream =
+            ByteArrayOutputStream()
 
-        if (
-            bestClass < 0 ||
-            bestConfidence < POSSIBLE_CONFIDENCE
-        ) {
-            return null
-        }
+        yuvImage.compressToJpeg(
+            android.graphics.Rect(
+                0,
+                0,
+                image.width,
+                image.height
+            ),
+            90,
+            outputStream
+        )
 
-        return Detection(
-            classId = bestClass,
-            confidence = bestConfidence,
-            width = bestWidth,
-            height = bestHeight
+        // ---------------------------------------------------------
+        // JPEG → BYTE ARRAY
+        // ---------------------------------------------------------
+
+        val imageBytes =
+            outputStream.toByteArray()
+
+        // ---------------------------------------------------------
+        // BYTE ARRAY → BITMAP
+        // ---------------------------------------------------------
+
+        return BitmapFactory.decodeByteArray(
+            imageBytes,
+            0,
+            imageBytes.size
         )
     }
 
-    private fun handleDetection(
-        detection: Detection
-    ) {
+    // =============================================================
+    // ROTAR BITMAP
+    // =============================================================
 
-        val classId =
-            detection.classId
+    private fun rotateBitmap(
+        bitmap: Bitmap,
+        rotationDegrees: Int
+    ): Bitmap {
 
-        val confidence =
-            detection.confidence
-
-        val width =
-            detection.width
-
-        val height =
-            detection.height
-
-        /*
-         * Aproximación del tamaño del billete
-         * dentro del fotograma.
-         */
-        val area =
-            (width * height)
-                .coerceIn(0f, 1f)
-
-        Log.d(
-            TAG,
-            "DETECCIÓN: clase=$classId " +
-                    "confianza=${confidence * 100}% " +
-                    "area=$area"
-        )
-
-        /*
-         * Primero damos orientación física.
-         */
-
-        if (area < TOO_FAR_AREA) {
-
-            resetStability()
-
-            speakGuidance(
-                "El billete está muy lejos. " +
-                        "Acerca la cámara lentamente."
-            )
-
-            return
-        }
-
-        if (area > TOO_CLOSE_AREA) {
-
-            resetStability()
-
-            speakGuidance(
-                "El billete está muy cerca. " +
-                        "Aleja un poco la cámara."
-            )
-
-            return
-        }
-
-        /*
-         * Si llegó hasta aquí, el tamaño
-         * del billete es razonable.
-         */
-
-        if (classId == lastClassId) {
-
-            stableFrames++
-
-        } else {
-
-            lastClassId =
-                classId
-
-            stableFrames = 1
-        }
-
-        /*
-         * Confianza baja.
-         */
-        if (confidence < POSSIBLE_CONFIDENCE) {
-
-            speakGuidance(
-                "No puedo identificar bien el billete. " +
-                        "Muévelo un poco y mantenlo centrado."
-            )
-
-            return
-        }
-
-        /*
-         * Detección posible.
-         */
-        if (confidence < CONFIRMED_CONFIDENCE) {
-
-            speakGuidance(
-                "Billete detectado. " +
-                        "Mantén la cámara estable."
-            )
-
-            return
-        }
-
-        /*
-         * Confianza >= 80%.
-         *
-         * Ahora exigimos varios fotogramas
-         * consecutivos con la misma clase.
-         */
-        if (
-            confidence >= CONFIRMED_CONFIDENCE &&
-            stableFrames >= REQUIRED_STABLE_FRAMES
-        ) {
-
-            val now =
-                SystemClock.elapsedRealtime()
-
-            if (
-                now - lastConfirmationTime
-                >= CONFIRMATION_COOLDOWN_MS
-            ) {
-
-                alreadyConfirmed = true
-
-                lastConfirmationTime =
-                    now
-
-                Log.d(
-                    TAG,
-                    "DETECCIÓN CONFIRMADA: " +
-                            "clase=$classId " +
-                            "confianza=${confidence * 100}%"
-                )
-
-                onConfirmed(
-                    classId,
-                    confidence
-                )
-            }
-        } else {
-
-            speakGuidance(
-                "Billete detectado. " +
-                        "Mantén la cámara estable."
-            )
-        }
-    }
-
-    private fun resetStability() {
-
-        stableFrames = 0
-        lastClassId = -1
-    }
-
-    private fun speakGuidance(
-        message: String
-    ) {
-
-        val now =
-            SystemClock.elapsedRealtime()
+        // ---------------------------------------------------------
+        // Si no necesita rotación
+        // ---------------------------------------------------------
 
         if (
-            now - lastGuidanceTime
-            < GUIDANCE_INTERVAL_MS
+            rotationDegrees == 0
         ) {
-            return
+
+            return bitmap
         }
 
-        lastGuidanceTime =
-            now
+        // ---------------------------------------------------------
+        // MATRIZ
+        // ---------------------------------------------------------
 
-        onGuidance(message)
+        val matrix =
+            Matrix()
 
-        tts.speak(
-            message,
-            TextToSpeech.QUEUE_FLUSH,
-            null,
-            "guidance"
+        matrix.postRotate(
+            rotationDegrees.toFloat()
+        )
+
+        // ---------------------------------------------------------
+        // CREAR BITMAP ROTADO
+        // ---------------------------------------------------------
+
+        return Bitmap.createBitmap(
+            bitmap,
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+            matrix,
+            true
         )
     }
+
+    // =============================================================
+    // CERRAR DETECTOR
+    // =============================================================
 
     fun close() {
 
         try {
-            interpreter.close()
-        } catch (_: Exception) {
-        }
 
-        try {
-            tts.stop()
-            tts.shutdown()
-        } catch (_: Exception) {
+            // -----------------------------------------------------
+            // CERRAR TFLITE
+            // -----------------------------------------------------
+
+            interpreter?.close()
+
+            interpreter = null
+
+            // -----------------------------------------------------
+            // CERRAR TEXT TO SPEECH
+            // -----------------------------------------------------
+
+            if (
+                ::textToSpeech
+                    .isInitialized
+            ) {
+
+                textToSpeech.stop()
+
+                textToSpeech.shutdown()
+            }
+
+        }catch (e: Exception) {
+
+            Log.e(
+                "BilleteDetector",
+                "ERROR DURANTE EL PROCESAMIENTO",
+                e
+            )
+        }
         }
     }
-}
