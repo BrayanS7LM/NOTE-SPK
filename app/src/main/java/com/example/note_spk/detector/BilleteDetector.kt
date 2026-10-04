@@ -88,6 +88,14 @@ class BilleteDetector(
             "cinco mil pesos"
         )
     }
+    private val CLASS_VALUES = longArrayOf(
+        100000L, // Cien mil
+        10000L,  // Diez mil
+        20000L,  // Veinte mil
+        2000L,   // Dos mil
+        50000L,  // Cincuenta mil
+        5000L    // Cinco mil
+    )
 
     // =============================================================
     // VARIABLES
@@ -109,6 +117,29 @@ class BilleteDetector(
 
     @Volatile
     private var isProcessing = false
+
+    // =========================================================
+    // ÚLTIMO RESULTADO DE DETECCIÓN
+    // =========================================================
+
+    data class DetectionResult(
+        val valor: String,
+        val confianza: Float
+    )
+
+    @Volatile
+    private var latestResult: DetectionResult? = null
+
+    @Volatile
+    private var lastResultTime: Long = 0L
+
+    fun getLatestResult(): DetectionResult? {
+        val currentTime = System.currentTimeMillis()
+        if (latestResult != null && currentTime - lastResultTime <= 3000L) {
+            return latestResult
+        }
+        return null
+    }
 
 // =========================================================
 // ESTABILIZACIÓN
@@ -339,6 +370,14 @@ class BilleteDetector(
                 parseOutput(output)
 
             if (detection != null) {
+
+                if (detection.classId in CLASS_NAMES.indices && detection.confidence >= POSSIBLE_THRESHOLD) {
+                    latestResult = DetectionResult(
+                        valor = SPEECH_NAMES[detection.classId],
+                        confianza = detection.confidence
+                    )
+                    lastResultTime = System.currentTimeMillis()
+                }
 
                 handleDetection(
                     detection
@@ -774,8 +813,8 @@ class BilleteDetector(
     }
 
     // =============================================================
-    // FIRESTORE
-    // =============================================================
+// FIRESTORE
+// =============================================================
 
     private fun saveRecognition(
         classId: Int,
@@ -784,41 +823,64 @@ class BilleteDetector(
     ) {
 
         // ---------------------------------------------------------
+        // Verificar clase
+        // ---------------------------------------------------------
+
+        if (classId !in CLASS_NAMES.indices) {
+            Log.e(
+                "BilleteDetector",
+                "classId inválido: $classId"
+            )
+            return
+        }
+
+        // ---------------------------------------------------------
         // USUARIO ACTUAL
         // ---------------------------------------------------------
 
-        val user =
-            auth.currentUser
-                ?: return
+        val user = auth.currentUser
 
-        val uid =
-            user.uid
+        if (user == null) {
+            Log.w(
+                "BilleteDetector",
+                "No hay usuario autenticado. No se guardará el reconocimiento."
+            )
+            return
+        }
+
+        val uid = user.uid
 
         // ---------------------------------------------------------
         // DATOS
         // ---------------------------------------------------------
 
-        val data =
-            hashMapOf(
+        val data = hashMapOf(
 
-                "billete" to
-                        CLASS_NAMES[classId],
+            // Nombre interno de la clase
+            "billete" to CLASS_NAMES[classId],
 
-                "valor" to
-                        SPEECH_NAMES[classId],
+            // Valor numérico real
+            // Ejemplo: 5000, 10000, 20000...
+            "valor" to CLASS_VALUES[classId],
 
-                "confianza" to
-                        confidence,
+            // Nombre para mostrar/hablar
+            "nombre" to SPEECH_NAMES[classId],
 
-                "confianzaPorcentaje" to
-                        confidence * 100f,
+            // ID de clase del modelo
+            "classId" to classId,
 
-                "confirmado" to
-                        confirmed,
+            // Confianza 0.0 - 1.0
+            "confianza" to confidence,
 
-                "timestamp" to
-                        FieldValue.serverTimestamp()
-            )
+            // Confianza 0 - 100
+            "confianzaPorcentaje" to confidence * 100f,
+
+            // Confirmación
+            "confirmado" to confirmed,
+
+            // Fecha/hora del servidor
+            "timestamp" to FieldValue.serverTimestamp()
+        )
 
         // ---------------------------------------------------------
         // GUARDAR
@@ -831,14 +893,21 @@ class BilleteDetector(
             .document(uid)
             .collection("Reconocimientos")
             .add(data)
-            .addOnSuccessListener {
+            .addOnSuccessListener { documentReference ->
 
-                // Guardado correctamente
+                Log.d(
+                    "BilleteDetector",
+                    "Reconocimiento guardado: ${documentReference.id}"
+                )
 
             }
             .addOnFailureListener { exception ->
 
-                exception.printStackTrace()
+                Log.e(
+                    "BilleteDetector",
+                    "Error guardando reconocimiento",
+                    exception
+                )
             }
     }
 

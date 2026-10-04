@@ -244,35 +244,35 @@ class CameraActivity : AppCompatActivity() {
 
     private fun takePhoto() {
 
-        val imageCapture =
-            imageCapture ?: return
+        val resultado = billeteDetector.getLatestResult()
 
-        try {
-
-            Toast.makeText(
-                this,
-                "Foto capturada correctamente",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            val intent =
-                Intent(
-                    this,
-                    ProcessingActivity::class.java
-                )
-
-            startActivity(intent)
-
-            finish()
-
-        } catch (exc: Exception) {
+        if (resultado == null) {
 
             Toast.makeText(
                 this,
-                "Error al tomar foto: ${exc.message}",
+                "No se ha detectado ningún billete",
                 Toast.LENGTH_SHORT
             ).show()
+
+            return
         }
+
+        val intent = Intent(
+            this,
+            ScanResultActivity::class.java
+        )
+
+        intent.putExtra(
+            "BILLETE_DETECTADO",
+            resultado.valor
+        )
+
+        intent.putExtra(
+            "CONFIANZA",
+            resultado.confianza
+        )
+
+        startActivity(intent)
     }
 
     // =============================================================
