@@ -21,7 +21,8 @@ import java.nio.channels.FileChannel
 import java.util.Locale
 
 class BilleteDetector(
-    private val context: Context
+    private val context: Context,
+    private val onDetectionConfirmed: (String, Float) -> Unit
 ) : TextToSpeech.OnInitListener {
 
     companion object {
@@ -758,15 +759,18 @@ class BilleteDetector(
         // ---------------------------------------------------------
 
         saveRecognition(
-            classId =
-                classId,
-
-            confidence =
-                confidence,
-
-            confirmed =
-                confirmed
+            classId = classId,
+            confidence = confidence,
+            confirmed = confirmed
         )
+
+        if (confirmed) {
+
+            onDetectionConfirmed(
+                SPEECH_NAMES[classId],
+                confidence
+            )
+        }
     }
 
     // =============================================================
@@ -1154,7 +1158,7 @@ class BilleteDetector(
                 textToSpeech.shutdown()
             }
 
-        }catch (e: Exception) {
+        } catch (e: Exception) {
 
             Log.e(
                 "BilleteDetector",
@@ -1162,5 +1166,5 @@ class BilleteDetector(
                 e
             )
         }
-        }
     }
+}

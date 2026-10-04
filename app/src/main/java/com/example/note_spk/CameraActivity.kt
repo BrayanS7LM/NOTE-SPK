@@ -49,7 +49,33 @@ class CameraActivity : AppCompatActivity() {
         // INICIALIZAR DETECTOR
         // =========================================================
 
-        billeteDetector = BilleteDetector(this)
+        billeteDetector = BilleteDetector(
+            this
+        ) { valorDetectado, confianza ->
+
+            runOnUiThread {
+
+                val intent =
+                    Intent(
+                        this,
+                        ScanResultActivity::class.java
+                    )
+
+                intent.putExtra(
+                    "BILLETE_DETECTADO",
+                    valorDetectado
+                )
+
+                intent.putExtra(
+                    "CONFIANZA",
+                    confianza
+                )
+
+                startActivity(intent)
+
+                finish()
+            }
+        }
 
         // =========================================================
         // EXECUTOR PARA CAMERA X

@@ -91,7 +91,7 @@
             android:id="@+id/tvPregunta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="¿DESEAS ESCANEAR OTRO BILLETE O MONEDA?"
+            android:text="¿DESEAS ESCANEAR OTRO BILLETE?"
             android:gravity="center"
             android:textStyle="bold"
             android:textAllCaps="true"
