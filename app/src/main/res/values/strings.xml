@@ -3,4 +3,5 @@
     <string name="app_name">Note Speak</string>
     <string name="logo_content_desc">Logotipo de Note Speak</string>
     <string name="splash_announce">Note Speak iniciada</string>
+    <string name="default_web_client_id">1098557488839-s6d1t5o7qa2o10rsq82tobb3do0s661r.apps.googleusercontent.com</string>
 </resources>

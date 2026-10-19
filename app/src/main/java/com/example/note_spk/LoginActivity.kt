@@ -8,17 +8,28 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.lifecycle.lifecycleScope
 import com.example.note_spk.databinding.ActivityLoginBinding
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
     private lateinit var biometricPrompt: BiometricPrompt
+    private lateinit var credentialManager: CredentialManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +37,8 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         auth = FirebaseAuth.getInstance()
+        credentialManager = CredentialManager.create(this)
+
         setupBiometricPrompt()
         setupClickListeners()
 
@@ -53,11 +66,69 @@ class LoginActivity : AppCompatActivity() {
 
         // Botón Google
         binding.btnGoogle.setOnClickListener {
-            Toast.makeText(this, "Iniciar con Google (futuro desarrollo)", Toast.LENGTH_SHORT).show()
+            signInWithGoogle()
         }
+
         // Ir a la pantalla de registro
         binding.tvCreateAccount.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
+        }
+    }
+
+    // ---------- GOOGLE SIGN-IN ----------
+
+    private fun signInWithGoogle() {
+        val signInOption = GetSignInWithGoogleOption.Builder(
+            serverClientId = getString(R.string.default_web_client_id)
+        ).build()
+
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(signInOption)
+            .build()
+
+        lifecycleScope.launch {
+            try {
+                val result = credentialManager.getCredential(
+                    context = this@LoginActivity,
+                    request = request
+                )
+                handleGoogleCredential(result.credential)
+            } catch (e: GetCredentialException) {
+                Toast.makeText(
+                    this@LoginActivity,
+                    "No se pudo iniciar sesión con Google",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun handleGoogleCredential(credential: androidx.credentials.Credential) {
+        if (
+            credential is CustomCredential &&
+            credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+        ) {
+            try {
+                val googleIdTokenCredential =
+                    GoogleIdTokenCredential.createFrom(credential.data)
+
+                val idToken = googleIdTokenCredential.idToken
+                val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
+
+                auth.signInWithCredential(firebaseCredential)
+                    .addOnSuccessListener { result ->
+                        val user = result.user
+                        goToHome(user?.displayName.orEmpty(), user?.email.orEmpty())
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Error al iniciar sesión con Google", Toast.LENGTH_SHORT).show()
+                    }
+
+            } catch (e: GoogleIdTokenParsingException) {
+                Toast.makeText(this, "Credencial de Google no válida", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Tipo de credencial no reconocido", Toast.LENGTH_SHORT).show()
         }
     }
 
