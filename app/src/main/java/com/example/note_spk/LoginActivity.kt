@@ -117,8 +117,24 @@ class LoginActivity : AppCompatActivity() {
 
                 auth.signInWithCredential(firebaseCredential)
                     .addOnSuccessListener { result ->
-                        val user = result.user
-                        goToHome(user?.displayName.orEmpty(), user?.email.orEmpty())
+                        val esUsuarioNuevo = result.additionalUserInfo?.isNewUser == true
+
+                        if (esUsuarioNuevo) {
+                            // Esta cuenta de Google nunca se ha registrado: no la dejamos entrar
+                            // a medias, cerramos la sesión recién creada y mandamos a Registro.
+                            auth.signOut()
+
+                            Toast.makeText(
+                                this,
+                                "Esta cuenta no está registrada. Crea tu cuenta primero.",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            startActivity(Intent(this, RegisterActivity::class.java))
+                        } else {
+                            val user = result.user
+                            goToHome(user?.displayName.orEmpty(), user?.email.orEmpty())
+                        }
                     }
                     .addOnFailureListener {
                         Toast.makeText(this, "Error al iniciar sesión con Google", Toast.LENGTH_SHORT).show()

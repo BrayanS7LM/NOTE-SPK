@@ -126,21 +126,6 @@
             android:textColor="#000000"
             app:cornerRadius="8dp"/>
 
-        <!-- Facebook button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFacebook"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="CONTINUAR CON FACEBOOK"
-            app:icon="@drawable/ic_facebook"
-            app:iconGravity="textStart"
-            app:iconPadding="12dp"
-            app:iconTint="@null"
-            app:iconSize="24dp"
-            android:backgroundTint="#1877F2"
-            android:textColor="@android:color/white"
-            app:cornerRadius="8dp"/>
-
         <TextView
             android:id="@+id/tvHaveAccount"
             android:layout_width="wrap_content"
