@@ -4,10 +4,15 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.lifecycle.lifecycleScope
 import com.example.note_spk.databinding.ActivityHomeBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
 class HomeActivity : AppCompatActivity() {
 
@@ -19,6 +24,10 @@ class HomeActivity : AppCompatActivity() {
 
     private val db by lazy {
         FirebaseFirestore.getInstance()
+    }
+
+    private val credentialManager by lazy {
+        CredentialManager.create(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,16 +60,11 @@ class HomeActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // PERFIL
+        // PERFIL -> CERRAR SESIÓN
         // =====================================================
 
         binding.btnPerfil.setOnClickListener {
-
-            Toast.makeText(
-                this,
-                "Perfil",
-                Toast.LENGTH_SHORT
-            ).show()
+            mostrarDialogoCerrarSesion()
         }
 
         // =====================================================
@@ -164,6 +168,45 @@ class HomeActivity : AppCompatActivity() {
 
         binding.tvSaludo.text =
             "¡Hola, $nombre!"
+    }
+
+    // =========================================================
+    // CERRAR SESIÓN
+    // =========================================================
+
+    private fun mostrarDialogoCerrarSesion() {
+
+        AlertDialog.Builder(this)
+            .setTitle("Cerrar sesión")
+            .setMessage("¿Seguro que quieres cerrar sesión?")
+            .setPositiveButton("Cerrar sesión") { _, _ ->
+                cerrarSesion()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun cerrarSesion() {
+
+        // Cierra la sesión de Firebase
+        auth.signOut()
+
+        // Limpia también el estado del selector de cuentas de Google,
+        // para que la próxima vez vuelva a mostrar la lista de cuentas
+        lifecycleScope.launch {
+            try {
+                credentialManager.clearCredentialState(
+                    ClearCredentialStateRequest()
+                )
+            } catch (e: Exception) {
+                // No es crítico si esto falla; la sesión de Firebase ya se cerró
+            }
+
+            val intent = Intent(this@HomeActivity, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 
     // =========================================================

@@ -123,17 +123,20 @@
             android:textColor="#FFFFFF"
             android:textSize="14sp"/>
 
+        <!-- Aviso con enlaces a Términos de Servicio y Política de Privacidad.
+             El texto y los enlaces se arman en LoginActivity.setupTermsLinks().
+             Sin contentDescription para que TalkBack lea el texto real y detecte los enlaces. -->
         <TextView
             android:id="@+id/tvTerms"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Al hacer clic en continuar, aceptas nuestros Términos de Servicio y nuestra Política de Privacidad"
+            android:text="@string/login_terms_notice"
             android:textColor="@android:color/white"
             android:textSize="12sp"
             android:gravity="center"
+            android:lineSpacingMultiplier="1.2"
             android:layout_marginTop="30dp"
-            android:layout_marginBottom="20dp"
-            android:contentDescription="Aviso de términos de servicio"/>
+            android:layout_marginBottom="20dp"/>
 
     </LinearLayout>
 </ScrollView>

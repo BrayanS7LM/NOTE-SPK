@@ -1,8 +1,16 @@
 package com.example.note_spk
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.util.Patterns
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
@@ -41,6 +49,7 @@ class LoginActivity : AppCompatActivity() {
 
         setupBiometricPrompt()
         setupClickListeners()
+        setupTermsLinks()
 
         // Si ya hay una sesión guardada, intentar entrar con huella
         val currentUser = auth.currentUser
@@ -73,6 +82,50 @@ class LoginActivity : AppCompatActivity() {
         binding.tvCreateAccount.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
+    }
+
+    // ---------- TÉRMINOS Y POLÍTICA DE PRIVACIDAD ----------
+
+    /**
+     * Convierte "Términos de Servicio" y "Política de Privacidad" dentro del aviso
+     * en enlaces tocables que abren TermsActivity con el documento correspondiente.
+     */
+    private fun setupTermsLinks() {
+        val fullText = getString(R.string.login_terms_notice)
+        val spannable = SpannableString(fullText)
+
+        fun addLink(label: String, action: () -> Unit) {
+            val start = fullText.indexOf(label)
+            if (start < 0) return
+            spannable.setSpan(
+                object : ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        action()
+                    }
+
+                    override fun updateDrawState(ds: TextPaint) {
+                        super.updateDrawState(ds)
+                        ds.color = Color.WHITE
+                        ds.isUnderlineText = true
+                        ds.typeface = Typeface.DEFAULT_BOLD
+                    }
+                },
+                start,
+                start + label.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+
+        addLink(getString(R.string.terms_of_service)) {
+            startActivity(TermsActivity.newIntent(this, TermsActivity.TYPE_TERMS))
+        }
+        addLink(getString(R.string.privacy_policy)) {
+            startActivity(TermsActivity.newIntent(this, TermsActivity.TYPE_PRIVACY))
+        }
+
+        binding.tvTerms.text = spannable
+        binding.tvTerms.movementMethod = LinkMovementMethod.getInstance()
+        binding.tvTerms.highlightColor = Color.TRANSPARENT
     }
 
     // ---------- GOOGLE SIGN-IN ----------

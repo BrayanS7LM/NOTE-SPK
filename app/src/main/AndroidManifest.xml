@@ -29,6 +29,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".TermsActivity"
+            android:exported="false" />
+
         <activity android:name=".LoginActivity" />
         <activity android:name=".RegisterActivity" android:exported="false" />
         <activity
