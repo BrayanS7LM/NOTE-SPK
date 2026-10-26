@@ -8,8 +8,8 @@
     android:background="@color/white">
 
     <!-- Scrollable content (tarjetas, textos, etc.)
-         IMPORTANTE: paddingBottom debe ser al menos la altura de la bottom nav + espacio extra
-         para que el contenido no quede oculto. -->
+         IMPORTANTE: paddingBottom debe ser al menos la altura del botón de cámara + espacio extra
+         para que el contenido no quede oculto detrás de él. -->
     <ScrollView
         android:id="@+id/scrollContent"
         android:layout_width="0dp"
@@ -21,7 +21,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigationView">
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -50,7 +50,7 @@
                     android:gravity="center"
                     android:text="NOTE SPEAK"
                     android:textStyle="bold"
-                    android:textSize="18sp"
+                    android:textSize="22sp"
                     android:fontFamily="@font/bungee_regular"
                     android:textColor="@color/black" />
 
@@ -62,8 +62,7 @@
                     android:contentDescription="Perfil" />
             </LinearLayout>
 
-            <!-- Tarjetas de estadísticas (ConstraintLayout->MaterialCard se pueden mantener)
-                 (copié tus MaterialCardView dentro del LinearLayout) -->
+            <!-- Tarjetas de estadísticas -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -95,16 +94,16 @@
                             android:layout_height="wrap_content"
                             android:text="Billetes Escaneados:"
                             android:textColor="@android:color/white"
-                            android:textSize="12sp" />
+                            android:textSize="18sp" />
 
                         <TextView
                             android:id="@+id/tvBilletes"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:fontFamily="@font/bungee_regular"
-                            android:text="55"
+                            android:text="0"
                             android:textColor="@android:color/white"
-                            android:textSize="20sp"
+                            android:textSize="25sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -135,17 +134,17 @@
                             android:layout_height="wrap_content"
                             android:text="Tu dinero:"
                             android:textColor="@android:color/white"
-                            android:textSize="12sp" />
+                            android:textSize="18sp" />
 
                         <TextView
                             android:id="@+id/tvDinero"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="$177.910"
+                            android:text="$0"
                             android:textStyle="bold"
                             android:textColor="@android:color/white"
                             android:fontFamily="@font/bungee_regular"
-                            android:textSize="20sp" />
+                            android:textSize="25sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -159,12 +158,14 @@
                 android:text="¡HOLA! USER"
                 android:textStyle="bold"
                 android:textColor="@color/black"
-                android:textSize="16sp"
+                android:textSize="18sp"
                 android:layout_marginTop="20dp"
                 android:fontFamily="@font/bungee_regular"
                 android:layout_gravity="start" />
 
-            <!-- Mensaje de uso (con fondo redondeado) -->
+            <!-- Mensaje de uso (con fondo redondeado).
+                 El texto se arma en HomeActivity.mostrarDiasDeUso() según la fecha de registro.
+                 Sin contentDescription para que TalkBack lea el texto real. -->
             <TextView
                 android:id="@+id/tvDias"
                 android:layout_width="match_parent"
@@ -173,18 +174,14 @@
                 android:gravity="center"
                 android:padding="12dp"
                 android:background="@drawable/bg_rounded_msg"
-                android:text="Usaste nuestra app: 32 días\nGracias por confiar en tus sueños!"
                 android:textColor="@android:color/white"
-                android:textSize="13sp"
+                android:textSize="18sp"
                 android:layout_marginBottom="24dp" />
-
-            <!-- (quita spacer enorme; el ScrollView tiene paddingBottom) -->
 
         </LinearLayout>
     </ScrollView>
 
-    <!-- Botón de cámara: centrado y anclado justo encima de la bottom nav.
-         Se mantendrá en la misma posición relativa independientemente de la resolución -->
+    <!-- Botón de cámara: centrado y anclado al fondo de la pantalla. -->
     <ImageButton
         android:id="@+id/btnScan"
         android:layout_width="96dp"
@@ -193,24 +190,10 @@
         android:background="@drawable/camera_button_bg"
         android:contentDescription="Escanear"
         android:scaleType="centerInside"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="-2dp"
-        android:elevation="200dp" />
-
-    <!-- Bottom navigation fijada al fondo -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigationView"
-        android:layout_width="0dp"
-        android:layout_height="72dp"
-        android:background="@color/white"
-        app:itemIconSize="32dp"
-        app:labelVisibilityMode="unlabeled"
-        app:itemRippleColor="@color/teal_200"
-        app:menu="@menu/bottom_nav_menu"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="24dp"
+        android:elevation="200dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

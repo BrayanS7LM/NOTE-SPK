@@ -2,7 +2,6 @@ package com.example.note_spk
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.MenuItem
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -13,6 +12,7 @@ import com.example.note_spk.databinding.ActivityHomeBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class HomeActivity : AppCompatActivity() {
 
@@ -79,57 +79,6 @@ class HomeActivity : AppCompatActivity() {
                 Toast.LENGTH_SHORT
             ).show()
         }
-
-        // =====================================================
-        // NAVEGACIÓN INFERIOR
-        // =====================================================
-
-        binding.bottomNavigationView.setOnItemSelectedListener {
-
-                item: MenuItem ->
-
-            when (item.itemId) {
-
-                R.id.nav_home -> {
-                    true
-                }
-
-                R.id.nav_search -> {
-
-                    Toast.makeText(
-                        this,
-                        "Buscar",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    true
-                }
-
-                R.id.nav_wallet -> {
-
-                    Toast.makeText(
-                        this,
-                        "Billetera",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    true
-                }
-
-                R.id.nav_notifications -> {
-
-                    Toast.makeText(
-                        this,
-                        "Notificaciones",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    true
-                }
-
-                else -> false
-            }
-        }
     }
 
     // =========================================================
@@ -141,6 +90,7 @@ class HomeActivity : AppCompatActivity() {
         super.onResume()
 
         cargarEstadisticas()
+        mostrarDiasDeUso()
     }
 
     // =========================================================
@@ -168,6 +118,35 @@ class HomeActivity : AppCompatActivity() {
 
         binding.tvSaludo.text =
             "¡Hola, $nombre!"
+    }
+
+    // =========================================================
+    // DÍAS DE USO DESDE EL REGISTRO (fecha de creación en Firebase Auth)
+    // =========================================================
+
+    private fun mostrarDiasDeUso() {
+
+        val creacion =
+            auth.currentUser?.metadata?.creationTimestamp
+
+        if (creacion == null || creacion <= 0L) {
+            // Sin dato de registro: no mostramos un número inventado
+            binding.tvDias.text = getString(R.string.home_usage_thanks)
+            return
+        }
+
+        val dias =
+            TimeUnit.MILLISECONDS
+                .toDays(System.currentTimeMillis() - creacion)
+                .toInt()
+                .coerceAtLeast(0)
+
+        binding.tvDias.text =
+            resources.getQuantityString(
+                R.plurals.home_usage_days,
+                dias,
+                dias
+            )
     }
 
     // =========================================================

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/values/legal_strings.xml
+     IMPORTANTE: reemplaza los datos entre corchetes [ ] antes de publicar la app.
+     Si ya tienes login_terms_notice, terms_of_service o privacy_policy en strings.xml,
+     bórralos de allí para evitar duplicados. -->
+<resources>
+
+    <string name="login_terms_notice">Al hacer clic en continuar, aceptas nuestros Términos de Servicio y nuestra Política de Privacidad</string>
+    <string name="terms_of_service">Términos de Servicio</string>
+    <string name="privacy_policy">Política de Privacidad</string>
+    <string name="terms_back">VOLVER</string>
+    <string name="terms_back_description">Volver a la pantalla de inicio de sesión</string>
+    <string name="legal_last_update">Última actualización: 25 de octubre de 2026</string>
+
+    <!-- ===================== TÉRMINOS DE SERVICIO ===================== -->
+    <string name="terms_content"><![CDATA[
+<b>1. Aceptación</b><br>
+Al crear una cuenta o usar NOTE SPEAK aceptas estos Términos de Servicio. Si no estás de acuerdo con ellos, no uses la aplicación.<br><br>
+
+<b>2. Qué hace la aplicación</b><br>
+NOTE SPEAK usa la cámara de tu dispositivo y un modelo de inteligencia artificial para identificar la denominación de billetes, y te comunica el resultado en pantalla y mediante voz. Está diseñada para facilitar la accesibilidad, en especial a personas con discapacidad visual.<br><br>
+
+<b>3. Limitaciones importantes</b><br>
+El resultado es una ayuda y puede ser incorrecto. Factores como poca luz, billetes rotos, doblados, sucios o parcialmente cubiertos, o una mala posición de la cámara pueden afectar la precisión.<br><br>
+NOTE SPEAK no verifica si un billete es auténtico o falso: solo estima su denominación.<br><br>
+En operaciones importantes, confirma el valor del billete con otra persona de confianza o por otro medio.<br><br>
+
+<b>4. Tu cuenta</b><br>
+Para usar la aplicación debes registrarte con correo y contraseña o con tu cuenta de Google. Debes darnos información verdadera y mantenerla actualizada. Eres responsable de proteger tu contraseña y de la actividad que ocurra en tu cuenta. Si crees que alguien accedió sin tu permiso, cambia tu contraseña y avísanos.<br><br>
+
+<b>5. Uso aceptable</b><br>
+Te comprometes a no:<br>
+• usar la aplicación para fines ilegales o fraudulentos;<br>
+• intentar acceder sin autorización a cuentas, sistemas o datos de otras personas;<br>
+• copiar, modificar, descompilar o hacer ingeniería inversa de la aplicación o de su modelo de inteligencia artificial, salvo lo que la ley permita;<br>
+• interferir con el funcionamiento normal de la aplicación o de sus servicios.<br><br>
+
+<b>6. Disponibilidad del servicio</b><br>
+La detección de billetes se hace en tu dispositivo, pero el inicio de sesión y el guardado del historial requieren conexión a internet. Podemos actualizar, modificar o suspender funciones de la aplicación, y no garantizamos que funcione sin interrupciones ni errores.<br><br>
+
+<b>7. Propiedad intelectual</b><br>
+La aplicación, su diseño, su código y su modelo de detección pertenecen a sus titulares y están protegidos por las normas de propiedad intelectual. Estos términos no te transfieren ningún derecho sobre ellos, salvo el de usar la aplicación de forma personal y no comercial.<br><br>
+
+<b>8. Limitación de responsabilidad</b><br>
+En la medida que la ley lo permita, NOTE SPEAK y sus responsables no responden por pérdidas o daños derivados de un resultado erróneo, de decisiones tomadas con base en él, de fallas del dispositivo o de la conexión, ni por el uso indebido de la aplicación. Esto no afecta los derechos que la ley te reconoce como consumidor.<br><br>
+
+<b>9. Cambios en estos términos</b><br>
+Podemos actualizar estos términos. Cuando haya cambios importantes te avisaremos en la aplicación. Si sigues usándola después del aviso, entendemos que aceptas los cambios.<br><br>
+
+<b>10. Ley aplicable</b><br>
+Estos términos se rigen por las leyes de la República de Colombia.<br><br>
+
+<b>11. Contacto</b><br>
+Si tienes preguntas sobre estos términos, escríbenos a notespeak@gmail.com.
+    ]]></string>
+
+    <!-- ===================== POLÍTICA DE PRIVACIDAD ===================== -->
+    <string name="privacy_content"><![CDATA[
+<b>1. Quién es responsable de tus datos</b><br>
+El responsable del tratamiento de tus datos personales es NOTE SPEAK, con contacto en notespeak@gmail.com.<br><br>
+
+<b>2. Qué datos recopilamos</b><br>
+• Datos de cuenta: nombre y correo electrónico. Si te registras con correo, también tu contraseña, que se guarda de forma protegida en Firebase Authentication y que nosotros no podemos ver.<br>
+• Inicio de sesión con Google: recibimos tu nombre y correo desde tu cuenta de Google. No recibimos tu contraseña de Google.<br>
+• Historial de escaneos: por cada escaneo guardamos el resultado (denominación detectada, nivel de confianza, fecha y hora) asociado a tu cuenta.<br>
+No te pedimos datos sensibles.<br><br>
+
+<b>3. Uso de la cámara</b><br>
+La aplicación pide permiso para usar la cámara solo para identificar billetes. Las imágenes se procesan directamente en tu dispositivo con un modelo local de inteligencia artificial. No enviamos esas imágenes a nuestros servidores.<br><br>
+
+<b>4. Huella o rostro</b><br>
+Si activas el ingreso con huella o rostro, la verificación la hace el sistema Android. NOTE SPEAK no recibe ni guarda datos biométricos: solo recibe la confirmación de que la verificación fue exitosa o no.<br><br>
+
+<b>5. Para qué usamos tus datos</b><br>
+• Crear y administrar tu cuenta y permitirte iniciar sesión.<br>
+• Mostrarte tu historial de escaneos y estadísticas.<br>
+• Mantener la seguridad de la aplicación y mejorar su funcionamiento.<br>
+No vendemos tus datos ni los usamos para publicidad.<br><br>
+
+<b>6. Con quién los compartimos</b><br>
+Usamos servicios de Google Firebase (Authentication y Cloud Firestore) para el inicio de sesión y el almacenamiento de datos, y los servicios de inicio de sesión de Google. Estos proveedores tratan los datos bajo sus propias políticas y pueden almacenarlos en servidores fuera de Colombia. Fuera de eso, solo compartiremos datos si una autoridad competente lo exige conforme a la ley.<br><br>
+
+<b>7. Cuánto tiempo los conservamos</b><br>
+Conservamos tus datos mientras tu cuenta esté activa. Si pides eliminar tu cuenta, borraremos tus datos personales y tu historial, salvo lo que la ley nos obligue a conservar.<br><br>
+
+<b>8. Tus derechos</b><br>
+De acuerdo con la Ley 1581 de 2012 (protección de datos personales en Colombia), puedes:<br>
+• conocer, actualizar y rectificar tus datos;<br>
+• pedir prueba de la autorización que nos diste;<br>
+• saber cómo usamos tus datos;<br>
+• revocar tu autorización y solicitar la eliminación de tus datos;<br>
+• presentar quejas ante la Superintendencia de Industria y Comercio.<br>
+Para ejercer estos derechos escríbenos a notespeak@gmail.com.<br><br>
+
+<b>9. Seguridad</b><br>
+Usamos medidas razonables para proteger tus datos, como conexiones cifradas y los controles de acceso de Firebase. Ningún sistema es completamente seguro, por lo que no podemos garantizar una protección absoluta.<br><br>
+
+<b>10. Menores de edad</b><br>
+La aplicación no está dirigida a menores de 18 años sin la autorización de sus padres o representantes legales.<br><br>
+
+<b>11. Cambios en esta política</b><br>
+Podemos actualizar esta política. Cuando haya cambios importantes te avisaremos en la aplicación.<br><br>
+
+<b>12. Contacto</b><br>
+Para dudas o solicitudes sobre tus datos, escríbenos a notespeak@gmail.com.
+    ]]></string>
+
+</resources>

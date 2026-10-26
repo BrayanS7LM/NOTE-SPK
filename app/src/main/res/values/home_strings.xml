@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/values/home_strings.xml -->
+<resources>
+
+    <plurals name="home_usage_days">
+        <item quantity="one">Usaste nuestra app: %d día\nGracias por confiar en tus sueños!</item>
+        <item quantity="other">Usaste nuestra app: %d días\nGracias por confiar en tus sueños!</item>
+    </plurals>
+
+    <!-- Se muestra solo si Firebase no entrega la fecha de registro -->
+    <string name="home_usage_thanks">Gracias por confiar en tus sueños!</string>
+
+</resources>
