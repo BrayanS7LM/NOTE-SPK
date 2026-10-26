@@ -57,11 +57,6 @@ class RegisterActivity : AppCompatActivity() {
             signUpWithGoogle()
         }
 
-        // Facebook
-        binding.btnFacebook.setOnClickListener {
-            Toast.makeText(this, "Registro con Facebook (futuro desarrollo)", Toast.LENGTH_SHORT).show()
-        }
-
         // Ya tengo una cuenta
         binding.tvHaveAccount.setOnClickListener {
             startActivity(Intent(this, LoginActivity::class.java))
